@@ -21,7 +21,11 @@ import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.media.PlaybackParams;
 import android.media.audiofx.AudioEffect;
+import android.media.audiofx.HapticGenerator;
 import android.net.Uri;
+import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.PowerManager;
 import android.util.Log;
 import android.widget.Toast;
@@ -35,6 +39,9 @@ import code.name.monkey.retromusic.ConstantsKt;
 import code.name.monkey.retromusic.R;
 import code.name.monkey.retromusic.service.playback.Playback;
 import code.name.monkey.retromusic.util.PreferenceUtil;
+import kotlinx.coroutines.CoroutineScope;
+import kotlinx.coroutines.Dispatchers;
+import kotlinx.coroutines.GlobalScope;
 
 /**
  * @author Andrew Neal, Karim Abou Zeid (kabouzeid)
@@ -45,6 +52,8 @@ public class MultiPlayer
 
     private MediaPlayer mCurrentMediaPlayer = new MediaPlayer();
     private MediaPlayer mNextMediaPlayer;
+
+    private HapticGenerator hapticGenerator;
 
     private final Context context;
     @Nullable
@@ -59,6 +68,19 @@ public class MultiPlayer
         this.context = context;
         mCurrentMediaPlayer.setWakeMode(context, PowerManager.PARTIAL_WAKE_LOCK);
         PreferenceManager.getDefaultSharedPreferences(context).registerOnSharedPreferenceChangeListener(this);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && HapticGenerator.isAvailable()) {
+            hapticGenerator = HapticGenerator.create(mCurrentMediaPlayer.getAudioSessionId());
+            hapticGenerator.setEnabled(true);
+            new Handler(Looper.getMainLooper())
+                    .post(() ->
+                            Toast.makeText(context, "Haptic Generator enabled", Toast.LENGTH_SHORT).show()
+                    );
+        } else {
+            new Handler(Looper.getMainLooper())
+                    .post(() ->
+                            Toast.makeText(context, "Haptic Generator not available", Toast.LENGTH_SHORT).show()
+                    );
+        }
     }
 
     /**
@@ -202,6 +224,7 @@ public class MultiPlayer
     @Override
     public void release() {
         stop();
+        if (hapticGenerator != null) hapticGenerator.release();
         mCurrentMediaPlayer.release();
         if (mNextMediaPlayer != null) {
             mNextMediaPlayer.release();
